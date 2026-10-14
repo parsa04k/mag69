@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مجله صنایع - فلیپ بوک</title>
+    
+    <!-- PDF.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    
+    <!-- StPageFlip Library -->
+    <script src="https://cdn.jsdelivr.net/npm/page-flip/dist/js/page-flip.browser.js"></script>
+
+    <style>
+        body {
+            background-color: #2c3e50;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            font-family: 'Tahoma', 'Arial', sans-serif;
+            margin: 0;
+            padding: 20px;
+            color: #fff;
+            overflow-x: hidden;
+        }
+
+        /* کانتینر اصلی فلیپ بوک */
+        #flipbook-container {
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
+            border-radius: 5px;
+            background: #fff;
+            overflow: hidden;
+            width: 100%;
+            max-width: 1300px; /* عرض مناسب برای دو صفحه A4 */
+            margin: 0 auto;
+            display: none; /* ابتدا مخفی است تا فایل لود شود */
+            direction: rtl; /* تنظیم جهت کانتینر */
+        }
+
+        /* کانتینر داخلی کتابخانه */
+        #flipbook {
+            direction: rtl; /* بسیار مهم برای راست‌چین شدن ورق‌ها */
+        }
+
+        /* استایل صفحات */
+        .my-page {
+            background-color: white;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            direction: rtl;
+        }
+
+        .my-page canvas {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        /* استایل لودینگ */
+        #loading {
+            font-size: 1.2rem;
+            color: #ecf0f1;
+            text-align: center;
+            margin-top: 50px;
+        }
+
+        /* استایل دکمه‌های ناوبری */
+        .controls {
+            margin-top: 25px;
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .controls button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 1rem;
+            font-family: inherit;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.1s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+        }
+
+        .controls button:hover:not(:disabled) {
+            background-color: #2980b9;
+        }
+
+        .controls button:active:not(:disabled) {
+            transform: scale(0.97);
+        }
+
+        .controls button:disabled {
+            background-color: #7f8c8d;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        /* واکنش‌گرایی برای موبایل */
+        @media (max-width: 600px) {
+            .controls button {
+                padding: 10px 20px;
+                font-size: 0.9rem;
+            }
+            #flipbook-container {
+                max-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="loading">در حال بارگذاری مجله، لطفاً شکیبا باشید...</div>
+
+    <div id="flipbook-container">
+        <!-- اضافه کردن dir="rtl" برای هدایت کتابخانه به سمت ورق زدن راست به چپ -->
+        <div id="flipbook" dir="rtl"></div>
+    </div>
+
+    <!-- دکمه‌های ناوبری -->
+    <div class="controls" id="nav-controls" style="display: none;">
+        <button id="btn-prev">صفحه قبل</button>
+        <button id="btn-next">صفحه بعد</button>
+    </div>
+
+    <script>
+        // ⚠️ نام فایل PDF خود را اینجا وارد کنید
+        const PDF_URL = 'magazine.pdf'; 
+
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        let pageFlip = null;
+        let totalPages = 0;
+
+        async function loadFlipbook() {
+            try {
+                const pdf = await pdfjsLib.getDocument(PDF_URL).promise;
+                totalPages = pdf.numPages;
+                const flipbookElement = document.getElementById('flipbook');
+                
+                flipbookElement.innerHTML = ''; 
+
+                // رندر کردن تمام صفحات PDF
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const viewport = page.getViewport({ scale: 2.0 }); 
+                    
+                    const canvas = document.createElement('canvas');
+                    const context = canvas.getContext('2d');
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
+
+                    await page.render({ canvasContext: context, viewport: viewport }).promise;
+
+                    const pageDiv = document.createElement('div');
+                    pageDiv.className = 'my-page';
+                    pageDiv.appendChild(canvas);
+                    
+                    flipbookElement.appendChild(pageDiv);
+                }
+
+                // پنهان کردن پیام لودینگ و نمایش دفتر و دکمه‌ها
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('flipbook-container').style.display = 'block';
+                document.getElementById('nav-controls').style.display = 'flex';
+
+                // راه‌اندازی کتابخانه فلیپ بوک با ابعاد A4
+                pageFlip = new St.PageFlip(flipbookElement, {
+                    width: 600,          // عرض پایه A4
+                    height: 848,         // ارتفاع پایه A4 (600 * 1.414)
+                    size: 'stretch',     
+                    minWidth: 300,       
+                    maxWidth: 800,      
+                    minHeight: 424,      
+                    maxHeight: 1131,      
+                    drawShadow: true,    
+                    flippingTime: 800,   
+                    usePortrait: true,   
+                    startZIndex: 0,
+                    autoSize: true,
+                    maxShadowOpacity: 0.5,
+                    showCover: true,     
+                    mobileScrollSupport: false
+                });
+
+                pageFlip.loadFromHTML(document.querySelectorAll('.my-page'));
+
+                // تنظیم وضعیت اولیه دکمه‌ها
+                updateButtons(0);
+
+                // رویداد تغییر صفحه برای آپدیت دکمه‌ها
+                pageFlip.on('flip', (e) => {
+                    updateButtons(e.data);
+                });
+
+            } catch (error) {
+                console.error("Error loading PDF: ", error);
+                document.getElementById('loading').style.display = 'none';
+                alert("خطا در بارگذاری فایل PDF. لطفا مطمئن شوید فایل '" + PDF_URL + "' در همان پوشه قرار دارد.");
+            }
+        }
+
+        // تابع آپدیت وضعیت دکمه‌ها
+        function updateButtons(currentPageIndex) {
+            const btnPrev = document.getElementById('btn-prev');
+            const btnNext = document.getElementById('btn-next');
+
+            // اگر در صفحه اول هستیم، دکمه قبلی غیرفعال شود
+            btnPrev.disabled = (currentPageIndex === 0);
+            
+            // اگر در صفحه آخر هستیم، دکمه بعدی غیرفعال شود
+            btnNext.disabled = (currentPageIndex >= totalPages - 1);
+        }
+
+        // رویدادهای کلیک دکمه‌ها
+        document.getElementById('btn-prev').addEventListener('click', () => {
+            if (pageFlip) pageFlip.flipPrev();
+        });
+
+        document.getElementById('btn-next').addEventListener('click', () => {
+            if (pageFlip) pageFlip.flipNext();
+        });
+
+        // اجرای خودکار تابع هنگام باز شدن صفحه
+        window.onload = loadFlipbook;
+
+        // مدیریت تغییر سایز پنجره (برای ریسپانسیو بودن)
+        window.addEventListener('resize', () => {
+            if (pageFlip) {
+                pageFlip.update();
+            }
+        });
+    </script>
+</body>
+</html>
